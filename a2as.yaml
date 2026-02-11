@@ -1,0 +1,148 @@
+manifest:
+  version: "0.1.3"
+  schema: https://a2as.org/cert/schema
+  subject:
+    name: ericabelson/agentic-gee-assistant
+    source: https://github.com/ericabelson/agentic-gee-assistant
+    branch: main
+    commit: "8fb7cd12"
+    scope: [gee-agent/agent.py]
+  issued:
+    by: A2AS.org
+    at: '2026-02-11T16:39:07Z'
+    url: https://a2as.org/certified/agents/ericabelson/agentic-gee-assistant
+  signatures:
+    digest: sha256:3C6wCfeNN1KfPuG6RCGDZ8-JU6S_0uVAFx8JGasfwN0
+    key: ed25519:DbfmuqaC4Ivb7D_eWvIXR4IosCwd7ZaN-hOfa6EaKbk
+    sig: ed25519:zmtOieaVI9Y0XWaCpdJ6wml4uMuj1cQpwDVJsNDqelOkkC62tVqg6q_iEOIqxWFh8HFHAET_QN_PFFDmheOABw
+
+agents:
+  gee_search_agent:
+    type: instance
+    models: [gemini-2.5-pro]
+    tools: [search_gee_catalog]
+    params:
+      name: gee_search_agent
+      description: "\n    Passes user requests to the Google Earth Engine catalog search tool.\n    "
+      instruction: [You are an agent that helps users find relevant datasets in Google Earth Engine.]
+  root_agent:
+    type: instance
+    models: [gemini-2.5-pro]
+    tools: [gee_search_agent, web_search_agent, web_fetch_agent]
+    params:
+      name: gee_agent
+      description: "\n        Coordinates the process of helping users discover and understand Google\n        Earth Engine\
+        \ datasets.\n\n        Coordinates search and details agents,\n        and presents the findings. "
+      instruction: [You are the primary coordinator for helping users find and understand, GEE datasets., Your top goal is
+          to indicate and "check" off as many items from the top, priority list and secondary priority list as possible by
+          quantifying the, 'appropriate fit of a given dataset, a reseacher''s needs (the user you''re', 'talking to), and
+          the potential for them as a good fit together!', The user will provide more information in additional conversation
+          turns, if needed., '## Research-Readiness Score', '(Based on data availability, resolution, documentation quality,
+          and', 'update frequency, provide a score from 0 to 5. Use emojis like 🟢 for', 'filled points and ⚪️ for empty, e.g.,
+          "Research-Readiness: 🟢🟢🟢⚪️⚪️', (3/5)" along with the core info needed in a concise format such as a, table), You
+          should ALWAYS output the summary of every message in the following, 'format:', ========================================================================,
+        '## Summary', A concise explanation of what the dataset measures and typical use cases, 'with plan language and practical
+          guidance (e.g., “Vegetation indices', 'from MODIS, useful for NDVI-based land cover change”).', '## Top priority
+          list', '### Dataset Title and GEE ID', e.g. MODIS/006/MOD13Q1 with a short human-readable label., '### Temporal
+          Coverage', 'Start and end dates of data availability, update frequency (e.g., daily,', '8-day composite, monthly),
+          and any known delays or gaps.', '### Spatial Resolution and Coverage', 'Pixel size (e.g., 250m, 30m), and global
+          vs. regional coverage.', '### Usage Recommendations', 'Situations where the dataset is especially valuable, and
+          caveats (e.g.,', “Better for large-area trends; noisy in cloudy regions”)., '### Comparison Notes', 'When multiple
+          datasets match the query, side-by-side notes highlight', 'tradeoffs (e.g., "Use VIIRS for finer nightlight detail,
+          but MODIS for', longer historical range")., '### Direct GEE Catalog Link', A clickable link to the dataset’s page
+          in the Earth Engine Data Catalog, for further exploration or manual use., '## Second priority list', '### Band Information',
+        'List of available bands with descriptions (e.g., NDVI, EVI, red, nir),', 'data types, and common band-specific quirks.',
+        '### Access and Filtering Fields', 'Metadata fields commonly used for filtering (e.g., system:time_start,', 'CLOUD_COVER,
+          QA bands) with guidance on how to use them effectively.', '### Preview Guidance', Recommendations on how to visualize
+          the dataset quickly in Earth Engine, '(e.g., Map.addLayer() code snippet with good defaults).']
+  web_fetch_agent:
+    type: instance
+    models: [gemini-2.5-pro]
+    tools: [fetch_webpage_text]
+    params:
+      name: web_fetch_agent
+      description: Gets the content of a webpage given a URL
+      instruction: [You are an agent that fetches information from a web page.]
+  web_search_agent:
+    type: instance
+    models: [gemini-2.5-pro]
+    tools: [google_search]
+    params:
+      name: web_search_agent
+      description: Performs a web search to find additional information about maps and datasets
+      instruction: [You are an agent that helps users perform web searches to find additional information about maps and datasets
+          in Google Earth Engine.]
+
+models:
+  gemini-2.5-pro:
+    type: literal
+    agents: [gee_search_agent, web_search_agent, web_fetch_agent, root_agent]
+
+tools:
+  fetch_webpage_text:
+    type: function
+    agents: [web_fetch_agent]
+    params:
+      description: |-
+        Fetches the text content of a given webpage URL.
+
+        Args:
+            url: The URL of the webpage to fetch.
+  gee_search_agent:
+    type: agent
+    agents: [root_agent]
+    params:
+      wrapper: AgentTool
+      agent: gee_search_agent
+  google_search:
+    type: module
+    agents: [web_search_agent]
+  search_gee_catalog:
+    type: function
+    agents: [gee_search_agent]
+    params:
+      description: Searches the GEE catalog online based on a query string.
+  web_fetch_agent:
+    type: agent
+    agents: [root_agent]
+    params:
+      wrapper: AgentTool
+      agent: web_fetch_agent
+  web_search_agent:
+    type: agent
+    agents: [root_agent]
+    params:
+      wrapper: AgentTool
+      agent: web_search_agent
+
+imports:
+  Agent: google.adk.agents.Agent
+  agent: agent
+  agent_tool: google.adk.tools.agent_tool
+  google_search: google.adk.tools.google_search
+  requests: requests
+
+functions:
+  fetch_webpage_text:
+    type: sync
+    module: gee-agent.agent
+    args: [url]
+    params:
+      returns: str
+  search_gee_catalog:
+    type: sync
+    module: gee-agent.agent
+    args: [query]
+    params:
+      returns: str
+
+networks:
+  developers.google.com:
+    type: api
+    actions: [GET]
+    urls: ['/{...}']
+    protocols: [https]
+    ports: ["443"]
+    params:
+      pattern: https://developers.google.com/s/results/earth-engine/datasets?q={query}
+      caller: [search_gee_catalog]
